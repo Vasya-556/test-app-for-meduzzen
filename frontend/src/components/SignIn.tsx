@@ -31,7 +31,8 @@ function SignIn() {
       });
 
       const data = await response.json();
-      console.log('Signin response:', data);
+      // console.log('Signin response:', data);
+      localStorage.setItem("token", data.access_token);
     } catch (error) {
       console.error('Error signing in:', error);
     }
