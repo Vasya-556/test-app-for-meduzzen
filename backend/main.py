@@ -5,10 +5,19 @@ from typing import List, Annotated, Optional
 import models
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
-import hashlib, os
+import hashlib, os, jwt
+from dotenv import load_dotenv
+from datetime import datetime, timedelta
+from fastapi.security import OAuth2PasswordBearer
+from jwt import PyJWTError
 
 app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 def get_db():
     db = SessionLocal()
@@ -32,6 +41,10 @@ class UserUpdate(BaseModel):
     username: Optional[str]
     email: Optional[EmailStr]
     password: Optional[str]
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 origins = [
     "http://localhost:3000"
@@ -85,8 +98,50 @@ async def signin(user: UserLogin, db: Session = Depends(get_db)):
     if existing_user.password != hash_password(user.password):
         raise HTTPException(status_code=400, detail="Invalid email or password")
     
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": existing_user.email}, expires_delta=access_token_expires
+    )
+
     return {
-        "id": str(existing_user.id),
-        "username": existing_user.username,
-        "email": existing_user.email,
+        "access_token": access_token, 
+        "token_type": "bearer",
+        # "id": str(existing_user.id),
+        # "username": existing_user.username,
+        # "email": existing_user.email,
+    }
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/signin/")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=401,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise credentials_exception
+    except PyJWTError:
+        raise credentials_exception
+
+    user = db.query(models.Users).filter(models.Users.email == email).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+@app.get("/me/")
+def read_users_me(current_user: models.Users = Depends(get_current_user)):
+    return {
+        "id": str(current_user.id),
+        "username": current_user.username,
+        "email": current_user.email
     }
