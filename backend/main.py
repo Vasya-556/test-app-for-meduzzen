@@ -33,7 +33,9 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr]
     password: Optional[str]
 
-origins = ["http://localhost:3000/"]
+origins = [
+    "http://localhost:3000"
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -43,8 +45,7 @@ app.add_middleware(
 )
 
 def hash_password(password: str) -> str:
-    salt = os.urandom(16)
-    return hashlib.sha256(password.encode() + salt).hexdigest()
+    return hashlib.sha256(password.encode()).hexdigest()
 
 @app.post("/signup/")
 async def create_user(user: UserCreateBase, db: Session = Depends(get_db)):
@@ -70,9 +71,22 @@ async def create_user(user: UserCreateBase, db: Session = Depends(get_db)):
         "id": str(new_user.id),
         "username": new_user.username,
         "email": new_user.email,
-        "is_active": new_user.is_active
     }
 
 @app.post("/signin/")
 async def signin(user: UserLogin, db: Session = Depends(get_db)):
-    return {"message": "signin"}
+    existing_user = db.query(models.Users).filter(
+        models.Users.email == user.email
+    ).first()
+    
+    if not existing_user:
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    if existing_user.password != hash_password(user.password):
+        raise HTTPException(status_code=400, detail="Invalid email or password")
+    
+    return {
+        "id": str(existing_user.id),
+        "username": existing_user.username,
+        "email": existing_user.email,
+    }
