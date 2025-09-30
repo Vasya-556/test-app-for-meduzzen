@@ -1,6 +1,6 @@
 import React, {useState} from 'react'
-import BaseUrl from '../BaseUrl';
-import { validateEmail, validatePasswordLength } from '../utils';
+import BaseUrl from '../utils/BaseUrl';
+import { validateEmail, validatePasswordLength } from '../utils/validationHelper';
 import { useNavigate } from 'react-router-dom';
 
 interface UserData {
