@@ -1,4 +1,5 @@
 import React, {useState, useEffect, use} from 'react'
+import { Link } from 'react-router-dom';
 
 function Header() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -20,14 +21,15 @@ function Header() {
 
   return (
     <header>
+        <Link to="/">Home</Link>
       {isLoggedIn? 
       <>
         <button onClick={handleLogout}>logout</button>
       </>: 
       
       <>
-        <a>signIn</a>
-        <a>signUp</a>
+        <Link to="/signin">sign in</Link>
+        <Link to="/signup">sign up</Link>
       </>}  
     </header>
   )
