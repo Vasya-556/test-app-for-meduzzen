@@ -9,17 +9,6 @@ interface User {
 	email?: string;
 }
 
-interface Message {
-	id: string;
-	sender_id: string;
-	recipient_id: string;
-	content: string;
-	attachments?: { filename: string; url: string }[];
-	created_at: string;
-	updated_at?: string;
-	type?: string;
-}
-
 function Chat() {
 	const { id: recipient_id } = useParams<{ id: string }>();
 	const [message, setMessage] = useState('');
