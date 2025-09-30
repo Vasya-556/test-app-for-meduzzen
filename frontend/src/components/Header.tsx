@@ -1,30 +1,16 @@
-import React, {useState, useEffect, use} from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom';
+import { useIsLoggedIn} from '../isLoggedIn'
 
 function Header() {
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-    useEffect(() => {
-        const token = localStorage.getItem("token");
-        token? setIsLoggedIn(true) : setIsLoggedIn(false)
-    }, []);
-
-    const handleLogout = async () => {
-        try {
-            localStorage.removeItem("token")
-            window.location.reload();
-        }
-        catch (error) {
-            console.error(error);
-        }
-    }
+    const { isLoggedIn, logout } = useIsLoggedIn();
 
   return (
     <header>
         <Link to="/">Home</Link>
       {isLoggedIn? 
       <>
-        <button onClick={handleLogout}>logout</button>
+        <button onClick={logout}>logout</button>
       </>: 
       
       <>
