@@ -71,9 +71,9 @@ function SignUp() {
   };
 
   return (
-    <div>
-      <h1>Sign Up</h1>
-      <form onSubmit={handleSubmit}>
+    <div className="max-w-md mx-auto p-6 bg-white shadow-md rounded-md mt-8">
+      <h1 className="text-2xl font-bold mb-4">Sign Up</h1>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
         <input
           type="text"
           name="username"
@@ -81,8 +81,9 @@ function SignUp() {
           required
           value={userData.username}
           onChange={handleChange}
+          className="border p-2 rounded"
         />
-        {errors.usernameError && <span>{errors.usernameError}</span>}
+        {errors.usernameError && <span className="text-red-500 text-sm">{errors.usernameError}</span>}
         <input
           type="email"
           name="email"
@@ -90,8 +91,9 @@ function SignUp() {
           required
           value={userData.email}
           onChange={handleChange}
+          className="border p-2 rounded"
         />
-        {errors.emailError && <span>{errors.emailError}</span>}
+        {errors.emailError && <span className="text-red-500 text-sm">{errors.emailError}</span>}
         <input
           type="password"
           name="password"
@@ -99,8 +101,9 @@ function SignUp() {
           required
           value={userData.password}
           onChange={handleChange}
+          className="border p-2 rounded"
         />
-        {errors.passwordError && <span>{errors.passwordError}</span>}
+        {errors.passwordError && <span className="text-red-500 text-sm">{errors.passwordError}</span>}
         <input
           type="password"
           name="confirmPassword"
@@ -108,9 +111,10 @@ function SignUp() {
           required
           value={userData.confirmPassword}
           onChange={handleChange}
+          className="border p-2 rounded"
         />
-        {errors.confirmPasswordError && <span>{errors.confirmPasswordError}</span>}
-        <button type="submit">Sign Up</button>
+        {errors.confirmPasswordError && <span className="text-red-500 text-sm">{errors.confirmPasswordError}</span>}
+        <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Sign Up</button>
       </form>
     </div>
   );

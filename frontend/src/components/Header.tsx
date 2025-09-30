@@ -27,18 +27,20 @@ function Header() {
     }, [isLoggedIn])
 
   return (
-    <header>
-        <Link to="/">Home</Link>
+    <header className="flex justify-between items-center p-4 bg-gray-100 shadow">
+        <Link to="/" className="font-bold text-lg">Home</Link>
       {isLoggedIn? 
-      <>
-        <span>Welcome <b>{thisUserInfo?.username}</b></span>
-        <button onClick={logout}>logout</button>
-      </>: 
+      <div className="flex items-center gap-4">
+        <span className="text-gray-700">
+          Welcome <b className="font-semibold text-black-600">{thisUserInfo?.username}</b>
+        </span>
+        <button onClick={logout} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">logout</button>
+      </div>: 
       
-      <>
-        <Link to="/signin">sign in</Link>
-        <Link to="/signup">sign up</Link>
-      </>}  
+      <div className="flex gap-4">
+        <Link to="/signin" className="text-blue-500 hover:underline">Sign in</Link>
+        <Link to="/signup" className="text-blue-500 hover:underline">Sign up</Link>
+      </div>}  
     </header>
   )
 }

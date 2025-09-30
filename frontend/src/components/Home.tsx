@@ -46,23 +46,28 @@ function Home() {
     }
     
   return (
-    <div>
+    <div className="max-w-lg mx-auto mt-8">
         {isLoggedIn? 
         <>
-            <h2>All Users:</h2>
-            <ul>
-                {users.map(user => (
-                    <div key={user.id}>
-                        {user.id !== thisUserId? <>
-                            <p>{user.username}</p>
-                            <button onClick={() => handleChatClick(user.id)}>chat</button>
-                        </>: <></>}
+            <h2 className="text-xl font-semibold mb-2">All Users:</h2>
+            <ul className="space-y-2">
+                {users.map(user => 
+                    user.id !== thisUserId && (
+                    <div key={user.id} className="flex justify-between items-center p-2 border rounded">
+                        <p>{user.username}</p>
+                        <button 
+                        onClick={() => handleChatClick(user.id)} 
+                        className="bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
+                        >
+                        Chat
+                        </button>
                     </div>
-                ))}
+                    )
+                )}
             </ul>
         </>:
         <>
-            <h1>Welcome! You need to log in to start chat</h1>
+            <h1 className="text-center text-gray-700">Welcome! You need to log in to start chat</h1>
         </>}
     </div>
   )

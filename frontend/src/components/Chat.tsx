@@ -169,69 +169,72 @@ function Chat() {
 	};
 
   return (
-    <div>
-      <h2>Chat with {recipientUser?.username || "..."}</h2>
-      <div>
+    <div className="max-w-lg mx-auto mt-6 p-4 bg-white shadow-md rounded-md">
+      <h2 className="text-xl font-semibold mb-4">Chat with {recipientUser?.username || "..."}</h2>
+      <div className="space-y-3 mb-4">
         {messages.map((msg, idx) => (
-          <div key={msg.id}>
+          <div key={msg.id} className="p-2 border rounded">
             <strong>{msg.sender_id === recipient_id ? recipientUser?.username : thisUserInfo?.username}:</strong> {msg.content}
             
 			{msg.attachments?.map((att: { filename: string; url: string }) => (
 				<div key={att.url}>
-					<a href={att.url} target="_blank" rel="noopener noreferrer">{att.filename}</a>
+					<a href={att.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{att.filename}</a>
 				</div>
 			))}
 
 			{editingMessageId === msg.id ? (
-        <>
-			
+        <div className="flex gap-2 mt-2">
           <input
             type="text"
             value={editingContent}
             onChange={e => setEditingContent(e.target.value)}
+			className="border p-1 rounded flex-1"
           />
-          <button onClick={() => handleConfirmEdit(msg.id)}>Save</button>
-          <button onClick={handleCancelEdit}>Cancel</button>
-        </>
+          <button onClick={() => handleConfirmEdit(msg.id)} className="bg-blue-500 text-white px-2 rounded">Save</button>
+          <button onClick={handleCancelEdit} className="bg-gray-300 px-2 rounded">Cancel</button>
+        </div>
       ) : (
         <>
           {msg.sender_id !== recipient_id && (
-            <>
-              <button onClick={() => handleEdit(msg.id, msg.content)}>Edit</button>
-              <button onClick={() => handleDelete(msg.id)}>Delete</button>
-            </>
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => handleEdit(msg.id, msg.content)} className="bg-yellow-400 px-2 rounded">Edit</button>
+              <button onClick={() => handleDelete(msg.id)} className="bg-red-400 px-2 rounded">Delete</button>
+            </div>
           )}
         </>
       )}
           </div>
         ))}
       </div>
-      <input
-        type="text"
-        value={message}
-        onChange={e => setMessage(e.target.value)}
-        placeholder="Send your message"
-      />
-      <input
-		type="file"
-		multiple
-		onChange={handleFileChange}
-		className="hidden"
-		id="file-input"
+	  <div className="flex flex-col gap-2">
+		<input
+			type="text"
+			value={message}
+			onChange={e => setMessage(e.target.value)}
+			placeholder="Send your message"
+		    className="border p-2 rounded w-full"
 		/>
-	  <label htmlFor="file-input">
-		Select files
-	  </label>
-	  <div>
-		{files.map((file, index) => (
-			<div key={index}>
-			{file.name}{" "}
-			<button onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}>Remove</button>
-			</div>
-		))}
-	  </div>
+		<input
+			type="file"
+			multiple
+			onChange={handleFileChange}
+			className="hidden"
+			id="file-input"
+			/>
+		<label htmlFor="file-input" className="cursor-pointer text-blue-500 hover:underline">
+			Select files
+		</label>
+		<div className="space-y-1">
+			{files.map((file, index) => (
+				<div key={index} className="flex justify-between items-center border p-1 rounded">
+				{file.name}{" "}
+				<button onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))} className="text-red-500">Remove</button>
+				</div>
+			))}
+		</div>
 
-      <button onClick={handleSend}>Send</button>
+		<button onClick={handleSend} className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Send</button>
+	  </div>
     </div>
   );
 }
