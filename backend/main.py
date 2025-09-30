@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
-from typing import List, Annotated, Optional
+from typing import Optional
 import models
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
@@ -81,9 +81,7 @@ async def create_user(user: UserCreateBase, db: Session = Depends(get_db)):
     db.refresh(new_user)
 
     return {
-        "id": str(new_user.id),
-        "username": new_user.username,
-        "email": new_user.email,
+        "message": "User created succesfully"
     }
 
 @app.post("/signin/")
@@ -106,9 +104,6 @@ async def signin(user: UserLogin, db: Session = Depends(get_db)):
     return {
         "access_token": access_token, 
         "token_type": "bearer",
-        # "id": str(existing_user.id),
-        # "username": existing_user.username,
-        # "email": existing_user.email,
     }
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -145,3 +140,14 @@ def read_users_me(current_user: models.Users = Depends(get_current_user)):
         "username": current_user.username,
         "email": current_user.email
     }
+
+@app.get("/users/")
+def get_all_users(db: Session = Depends(get_db)):
+    users = db.query(models.Users).all()
+    return [
+        {
+            "id": str(user.id),
+            "username": user.username,
+        }
+        for user in users
+    ]
