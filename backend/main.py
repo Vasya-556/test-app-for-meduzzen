@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError
+from fastapi import WebSocket, WebSocketDisconnect
+from uuid import UUID
 
 app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
@@ -151,3 +153,138 @@ def get_all_users(db: Session = Depends(get_db)):
         }
         for user in users
     ]
+
+@app.get("/users/{user_id}")
+def get_user(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(models.Users).filter(models.Users.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": str(user.id), "username": user.username}
+
+class ConnectionManager:
+    def __init__(self):
+        self.active: dict[str, WebSocket] = {}
+
+    async def connect(self, user_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self.active[user_id] = websocket
+
+    def disconnect(self, user_id: str):
+        self.active.pop(user_id, None)
+
+    async def send_personal_message(self, message: dict, user_id: str):
+        ws = self.active.get(user_id)
+        if ws:
+            try:
+                await ws.send_json(message)
+            except Exception:
+                self.disconnect(user_id)
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/")
+async def websocket_endpoint(websocket: WebSocket, token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+    except Exception:
+        await websocket.close(code=1008)
+        return
+
+    db = SessionLocal()
+    user = db.query(models.Users).filter(models.Users.email == email).first()
+    db.close()
+    if not user:
+        await websocket.close(code=1008)
+        return
+
+    user_id = str(user.id)
+    await manager.connect(user_id, websocket)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            recipient_id = data.get("recipient_id")
+            content = data.get("content")
+            if not recipient_id or not content:
+                continue
+
+            db = SessionLocal()
+            msg = models.Messages(sender_id=user.id, recipient_id=UUID(recipient_id), content=content)
+            db.add(msg)
+            db.commit()
+            db.refresh(msg)
+            db.close()
+
+            await websocket.send_json({
+                "type": "sent",
+                "id": str(msg.id),
+                "recipient_id": recipient_id,
+                "content": content,
+                "created_at": msg.created_at.isoformat(),
+                "updated_at": msg.updated_at.isoformat() if msg.updated_at else msg.created_at.isoformat()
+            })
+
+            await manager.send_personal_message({
+                "type": "new_message",
+                "id": str(msg.id),
+                "sender_id": str(user.id),
+                "content": content,
+                "created_at": msg.created_at.isoformat(),
+                "updated_at": msg.updated_at.isoformat() if msg.updated_at else msg.created_at.isoformat()
+            }, recipient_id)
+    except WebSocketDisconnect:
+        manager.disconnect(user_id)
+
+@app.get("/messages/{recipient_id}")
+def get_messages(recipient_id: str, current_user: models.Users = Depends(get_current_user), db: Session = Depends(get_db)):
+    messages = db.query(models.Messages).filter(
+        ((models.Messages.sender_id == current_user.id) & (models.Messages.recipient_id == UUID(recipient_id))) |
+        ((models.Messages.sender_id == UUID(recipient_id)) & (models.Messages.recipient_id == current_user.id))
+    ).order_by(models.Messages.created_at).all()
+
+    return [
+        {
+            "id": str(msg.id),
+            "sender_id": str(msg.sender_id),
+            "recipient_id": str(msg.recipient_id),
+            "content": msg.content,
+            "created_at": msg.created_at.isoformat(),
+            "updated_at": msg.updated_at.isoformat() if msg.updated_at else msg.created_at.isoformat()
+        }
+        for msg in messages
+    ]
+
+@app.put("/messages/{message_id}")
+def edit_message(
+    message_id: str,
+    new_content: dict,
+    current_user: models.Users = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    msg = db.query(models.Messages).filter(models.Messages.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if msg.sender_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not allowed to edit this message")
+    
+    msg.content = new_content.get("content", msg.content)
+    db.commit()
+    db.refresh(msg)
+    return {"id": str(msg.id), "content": msg.content}
+
+@app.delete("/messages/{message_id}")
+def delete_message(
+    message_id: str,
+    current_user: models.Users = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    msg = db.query(models.Messages).filter(models.Messages.id == message_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    if msg.sender_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not allowed to delete this message")
+    
+    db.delete(msg)
+    db.commit()
+    return {"message": "Deleted successfully"}
