@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 import models
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
@@ -10,8 +10,9 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer
 from jwt import PyJWTError
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, UploadFile, File, Form, Request
 from uuid import UUID
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
@@ -20,6 +21,15 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+
+if not os.path.exists("uploads"):
+    os.makedirs("uploads")
+
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+BACKEND_URL = "http://127.0.0.1:8000"
 
 def get_db():
     db = SessionLocal()
@@ -55,6 +65,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -243,17 +254,20 @@ def get_messages(recipient_id: str, current_user: models.Users = Depends(get_cur
         ((models.Messages.sender_id == UUID(recipient_id)) & (models.Messages.recipient_id == current_user.id))
     ).order_by(models.Messages.created_at).all()
 
-    return [
-        {
+    results = []
+    for msg in messages:
+        attachments = db.query(models.Attachments).filter(models.Attachments.message_id == msg.id).all()
+        results.append({
             "id": str(msg.id),
             "sender_id": str(msg.sender_id),
             "recipient_id": str(msg.recipient_id),
             "content": msg.content,
+            "attachments": [{"filename": att.filename, "url": f"{BACKEND_URL}/uploads/{att.filename}"} for att in attachments],
             "created_at": msg.created_at.isoformat(),
             "updated_at": msg.updated_at.isoformat() if msg.updated_at else msg.created_at.isoformat()
-        }
-        for msg in messages
-    ]
+        })
+    return results
+
 
 @app.put("/messages/{message_id}")
 def edit_message(
@@ -288,3 +302,55 @@ def delete_message(
     db.delete(msg)
     db.commit()
     return {"message": "Deleted successfully"}
+
+@app.post("/messages/send/")
+async def send_message(
+    request: Request,
+    recipient_id: str = Form(...),
+    content: Optional[str] = Form(None),
+    files: Optional[List[UploadFile]] = File(None),
+    current_user: models.Users = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    base_url = str(request.base_url)[:-1]
+    msg = models.Messages(
+        sender_id=current_user.id,
+        recipient_id=UUID(recipient_id),
+        content=content or ""
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
+    attachment_list = []
+    if files:
+        for file in files:
+            file_location = f"uploads/{file.filename}"
+            with open(file_location, "wb") as f:
+                f.write(await file.read())
+            attachment = models.Attachments(
+                message_id=msg.id,
+                filename=file.filename,
+                file_url=file_location
+            )
+            db.add(attachment)
+            attachment_list.append(attachment)
+        db.commit()
+
+    attachments_payload = [
+        {"filename": att.filename, "url": f"{base_url}/{att.file_url}"} for att in attachment_list
+    ]
+
+    response_payload = {
+        "id": str(msg.id),
+        "content": msg.content,
+        "attachments": attachments_payload,
+        "created_at": msg.created_at.isoformat()
+    }
+
+    await manager.send_personal_message(
+        {**response_payload, "type": "new_message", "sender_id": str(current_user.id)},
+        recipient_id
+    )
+
+    return response_payload
