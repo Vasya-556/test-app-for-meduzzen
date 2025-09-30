@@ -1,5 +1,7 @@
 import React, {useState} from 'react'
 import BaseUrl from '../BaseUrl';
+import { validateEmail, validatePasswordLength } from '../utils';
+import { useNavigate } from 'react-router-dom';
 
 interface UserData {
   email: string;
@@ -11,16 +13,35 @@ function SignIn() {
     email: '',
     password: '',
   });
+  const [errors, setErrors] = useState<{ 
+    emailError?: string; 
+    passwordError?: string
+  }>({});
+  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUserData({
       ...userData,
       [e.target.name]: e.target.value,
     });
+    setErrors({ ...errors, [`${e.target.name}Error`]: undefined });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const emailError = validateEmail(userData.email);
+    const passwordError = validatePasswordLength(userData.password);
+
+    const newErrors = {
+      emailError: emailError || undefined,
+      passwordError: passwordError || undefined,
+    };
+
+    setErrors(newErrors);
+
+    if (emailError || passwordError) return;
+
     try {
       const response = await fetch(`${BaseUrl}signin/`, {
         method: 'POST',
@@ -33,6 +54,7 @@ function SignIn() {
       const data = await response.json();
       // console.log('Signin response:', data);
       localStorage.setItem("token", data.access_token);
+      navigate('/');
     } catch (error) {
       console.error('Error signing in:', error);
     }
@@ -50,6 +72,7 @@ function SignIn() {
           value={userData.email}
           onChange={handleChange}
         />
+        {errors.emailError && <span>{errors.emailError}</span>}
         <input
           type="password"
           name="password"
@@ -58,6 +81,7 @@ function SignIn() {
           value={userData.password}
           onChange={handleChange}
         />
+        {errors.passwordError && <span>{errors.passwordError}</span>}
         <button type="submit">Sign In</button>
       </form>
     </div>

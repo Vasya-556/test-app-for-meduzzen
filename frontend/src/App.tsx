@@ -8,8 +8,6 @@ function App() {
   return (
     <div>
       <Header/>
-      {/* <SignUp/>
-      <SignIn/> */}
       <Routes>
         <Route path="/signin" element={<SignIn />} />
         <Route path="/signup" element={<SignUp />} />
