@@ -55,6 +55,7 @@ function SignIn() {
       // console.log('Signin response:', data);
       localStorage.setItem("token", data.access_token);
       navigate('/');
+      window.location.reload();
     } catch (error) {
       console.error('Error signing in:', error);
     }
