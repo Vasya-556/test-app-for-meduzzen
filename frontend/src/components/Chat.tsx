@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, ChangeEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import BaseUrl from '../utils/BaseUrl';
 import { getCurrentUserInfo } from "../utils/getCurrentUserInfo";
@@ -7,6 +7,17 @@ interface User {
 	id: string;
 	username: string;
 	email?: string;
+}
+
+interface Message {
+	id: string;
+	sender_id: string;
+	recipient_id: string;
+	content: string;
+	attachments?: { filename: string; url: string }[];
+	created_at: string;
+	updated_at?: string;
+	type?: string;
 }
 
 function Chat() {
@@ -18,6 +29,7 @@ function Chat() {
 	const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 	const [editingContent, setEditingContent] = useState('');
 	const [thisUserInfo, setThisUserInfo] = useState<User | null>(null);
+	const [files, setFiles] = useState<File[]>([]);
 
 	useEffect(() => {
 		const token = localStorage.getItem('token');
@@ -51,6 +63,11 @@ function Chat() {
 			const data = await res.json();
 			setMessages(data);
 			console.log(data)
+			if (!res.ok) {
+				console.error("Failed to fetch messages:", res.statusText);
+				setMessages([]);
+				return;
+			}
 		};
 
 		const fetchRecipientUser = async () => {
@@ -76,15 +93,31 @@ function Chat() {
 		};
 	}, [recipient_id]);
 
-	const handleSend = () => {
+	const handleSend = async () => {
 		if (!message || !ws.current) return;
 
-		ws.current.send(JSON.stringify({
-			recipient_id: recipient_id,
-			content: message
-		}));
+		const token = localStorage.getItem("token");
+		if (!token) return;
 
-		setMessage('');
+		if (files.length > 0) {
+			const formData = new FormData();
+			files.forEach(file => formData.append("files", file));
+			if (message) formData.append("content", message);
+			formData.append("recipient_id", recipient_id!);
+
+			const res = await fetch(`${BaseUrl}messages/send/`, {
+				method: "POST",
+				headers: { "Authorization": `Bearer ${token}` },
+				body: formData
+			});
+			const data = await res.json();
+			setMessages(prev => [...prev, data]);
+			setMessage('');
+			setFiles([]);
+		} else {
+			ws.current?.send(JSON.stringify({ recipient_id, content: message }));
+			setMessage('');
+		}
 	};
 
 	const handleDelete = async (msgId: string) => {
@@ -128,6 +161,13 @@ function Chat() {
 		setEditingContent('');
 	};
 
+	const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+		const selectedFiles = e.target.files;
+		if (selectedFiles) {
+			setFiles(prev => [...prev, ...Array.from(selectedFiles)]);
+		}
+	};
+
   return (
     <div>
       <h2>Chat with {recipientUser?.username || "..."}</h2>
@@ -135,8 +175,16 @@ function Chat() {
         {messages.map((msg, idx) => (
           <div key={msg.id}>
             <strong>{msg.sender_id === recipient_id ? recipientUser?.username : thisUserInfo?.username}:</strong> {msg.content}
-            {editingMessageId === msg.id ? (
+            
+			{msg.attachments?.map((att: { filename: string; url: string }) => (
+				<div key={att.url}>
+					<a href={att.url} target="_blank" rel="noopener noreferrer">{att.filename}</a>
+				</div>
+			))}
+
+			{editingMessageId === msg.id ? (
         <>
+			
           <input
             type="text"
             value={editingContent}
@@ -164,6 +212,25 @@ function Chat() {
         onChange={e => setMessage(e.target.value)}
         placeholder="Send your message"
       />
+      <input
+		type="file"
+		multiple
+		onChange={handleFileChange}
+		className="hidden"
+		id="file-input"
+		/>
+	  <label htmlFor="file-input">
+		Select files
+	  </label>
+	  <div>
+		{files.map((file, index) => (
+			<div key={index}>
+			{file.name}{" "}
+			<button onClick={() => setFiles(prev => prev.filter((_, i) => i !== index))}>Remove</button>
+			</div>
+		))}
+	  </div>
+
       <button onClick={handleSend}>Send</button>
     </div>
   );

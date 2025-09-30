@@ -10,6 +10,7 @@ interface User {
 }
 
 function Home() {
+    // eslint-disable-next-line
     const { isLoggedIn, logout } = useIsLoggedIn();
     const [users, setUsers] = useState<User[]>([]);
     const navigate = useNavigate();
